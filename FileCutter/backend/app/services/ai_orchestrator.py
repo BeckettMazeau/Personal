@@ -6,7 +6,10 @@ import aiohttp
 import fitz  # PyMuPDF
 from pptx import Presentation
 import os
+import sqlite3
+import hashlib
 from app.core.config import settings
+from app.core.utils import get_optimal_batch_size, batch_files
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +17,59 @@ class AIOrchestrator:
     def __init__(self, lm_studio_url: str = settings.lm_studio_url):
         self.lm_studio_url = lm_studio_url
         self.timeout = aiohttp.ClientTimeout(total=60)
+        self.cache_db = "file_cache.db"
+        self._init_cache()
+
+    def _init_cache(self):
+        conn = sqlite3.connect(self.cache_db)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS file_assessments (
+                hash TEXT PRIMARY KEY,
+                result TEXT
+            )
+        ''')
+        conn.commit()
+        conn.close()
+
+    def _get_file_hash(self, filepath: str) -> str:
+        if not os.path.exists(filepath):
+            return ""
+        hasher = hashlib.sha256()
+        try:
+            with open(filepath, 'rb') as f:
+                buf = f.read(65536)
+                while len(buf) > 0:
+                    hasher.update(buf)
+                    buf = f.read(65536)
+            return hasher.hexdigest()
+        except Exception as e:
+            logger.error(f"Error hashing {filepath}: {e}")
+            return ""
+
+    def _get_from_cache(self, file_hash: str) -> Optional[Dict[str, Any]]:
+        if not file_hash:
+            return None
+        conn = sqlite3.connect(self.cache_db)
+        cursor = conn.cursor()
+        cursor.execute("SELECT result FROM file_assessments WHERE hash = ?", (file_hash,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            try:
+                return json.loads(row[0])
+            except:
+                pass
+        return None
+
+    def _save_to_cache(self, file_hash: str, result: Dict[str, Any]):
+        if not file_hash:
+            return
+        conn = sqlite3.connect(self.cache_db)
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO file_assessments (hash, result) VALUES (?, ?)", (file_hash, json.dumps(result)))
+        conn.commit()
+        conn.close()
 
     async def _call_llm(self, messages: List[Dict[str, str]], response_format: Optional[Dict] = None) -> Optional[str]:
         """Helper to call LM Studio REST API with error handling and timeout."""
@@ -50,12 +106,9 @@ class AIOrchestrator:
             return []
 
         system_prompt = (
-            "You are an AI assistant helping to triage files for deletion. "
-            "Analyze the following list of filenames and return a JSON array of objects. "
-            "Each object must have the following keys: "
-            "'filename' (string), 'delete' (boolean, true if likely garbage/downloaded doc, false if likely user-generated), "
-            "'confidence' (integer 1-3, 1=low, 2=medium, 3=high), and 'reasoning' (string). "
-            "Respond ONLY with the JSON array."
+            "Triage files for deletion. Return JSON array of objects: "
+            "'filename'(str), 'delete'(boolean, true if garbage/download, false if user-made), "
+            "'confidence'(int 1-3), 'reasoning'(str). ONLY JSON."
         )
 
         user_prompt = "Filenames:\n" + "\n".join(filenames)
@@ -126,7 +179,7 @@ class AIOrchestrator:
 
     async def tier_2_evaluation(self, filepath: str) -> Dict[str, Any]:
         """Deep Pass: Extract text and evaluate content contextually."""
-        text = self._extract_text(filepath)
+        text = await asyncio.to_thread(self._extract_text, filepath)
 
         lower_path = filepath.lower()
         lower_content = text.lower()
@@ -191,12 +244,37 @@ class AIOrchestrator:
 
     async def process_files(self, filepaths: List[str]) -> List[Dict[str, Any]]:
         """Run the complete 2-tier evaluation pipeline."""
-        filenames = [os.path.basename(p) for p in filepaths]
-        filepath_map = {os.path.basename(p): p for p in filepaths}
-
-        tier_1_results = await self.tier_1_evaluation(filenames)
-
         final_results = []
+        uncached_filepaths = []
+        filepath_hash_map = {}
+
+        for filepath in filepaths:
+            file_hash = self._get_file_hash(filepath)
+            filepath_hash_map[filepath] = file_hash
+            cached_result = self._get_from_cache(file_hash)
+            if cached_result:
+                final_results.append(cached_result)
+            else:
+                uncached_filepaths.append(filepath)
+
+        if not uncached_filepaths:
+            return final_results
+
+        filenames = [os.path.basename(p) for p in uncached_filepaths]
+        filepath_map = {os.path.basename(p): p for p in uncached_filepaths}
+
+        batch_size = get_optimal_batch_size()
+        # chunk filenames instead of FileObject list, so we can't use batch_files directly
+        # or we adapt batch_files
+        filename_batches = [filenames[i:i + batch_size] for i in range(0, len(filenames), batch_size)]
+
+        tier_1_results = []
+        for batch in filename_batches:
+            batch_results = await self.tier_1_evaluation(batch)
+            tier_1_results.extend(batch_results)
+
+        tier_2_tasks = []
+        tier_2_items = []
 
         for item in tier_1_results:
             confidence = item.get("confidence", 1)
@@ -204,10 +282,18 @@ class AIOrchestrator:
 
             if confidence < 3 and filename in filepath_map:
                 filepath = filepath_map[filename]
-                tier_2_result = await self.tier_2_evaluation(filepath)
-                tier_2_result["reasoning"] = f"Tier 1 reasoning: {item.get('reasoning')}. Tier 2 reasoning: {tier_2_result.get('reasoning')}"
-                final_results.append(tier_2_result)
+                tier_2_tasks.append(self.tier_2_evaluation(filepath))
+                tier_2_items.append((filepath, item))
             else:
                 final_results.append(item)
+                if filename in filepath_map:
+                    self._save_to_cache(filepath_hash_map[filepath_map[filename]], item)
+
+        if tier_2_tasks:
+            tier_2_outputs = await asyncio.gather(*tier_2_tasks)
+            for (filepath, original_item), tier_2_result in zip(tier_2_items, tier_2_outputs):
+                tier_2_result["reasoning"] = f"Tier 1 reasoning: {original_item.get('reasoning')}. Tier 2 reasoning: {tier_2_result.get('reasoning')}"
+                final_results.append(tier_2_result)
+                self._save_to_cache(filepath_hash_map[filepath], tier_2_result)
 
         return final_results
