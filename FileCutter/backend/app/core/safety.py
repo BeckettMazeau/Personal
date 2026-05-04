@@ -1,6 +1,10 @@
 import send2trash
+import logging
 
-class DeletionService:
+logger = logging.getLogger(__name__)
+
+
+class SecureDeletionManager:
     """
     Service responsible for safely deleting files.
 
@@ -19,6 +23,5 @@ class DeletionService:
         Args:
             file_path (str): The absolute path to the file to be deleted.
         """
-        # Placeholder logic
-        # send2trash.send2trash(file_path)
-        pass
+        logger.info(f"Sending file to trash: {file_path}")
+        send2trash.send2trash(file_path)
