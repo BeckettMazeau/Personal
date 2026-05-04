@@ -2,13 +2,13 @@ import React from 'react';
 import { FixedSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 
-const VirtualizedFileList = ({ files, selectedFilePaths, onToggleSelect, onPreview }) => {
+const VirtualizedFileList = ({ files, selectedFilePaths, onToggleSelect, onPreview, activeIndex }) => {
 
   const getConfidenceColor = (level) => {
     switch(level) {
-      case 1: return '#e53e3e'; // Red (Low confidence / Keep)
+      case 1: return '#38a169'; // Green (Low confidence / Keep)
       case 2: return '#dd6b20'; // Orange (Medium confidence / Review)
-      case 3: return '#38a169'; // Green (High confidence / Delete)
+      case 3: return '#e53e3e'; // Red (High confidence / Delete)
       default: return '#718096'; // Gray (Unknown)
     }
   };
@@ -24,6 +24,7 @@ const VirtualizedFileList = ({ files, selectedFilePaths, onToggleSelect, onPrevi
   const Row = ({ index, style }) => {
     const file = files[index];
     const isSelected = selectedFilePaths.has(file.path);
+    const isActive = index === activeIndex;
 
     return (
       <div
@@ -33,7 +34,7 @@ const VirtualizedFileList = ({ files, selectedFilePaths, onToggleSelect, onPrevi
           alignItems: 'center',
           padding: '0 1rem',
           borderBottom: '1px solid #e2e8f0',
-          backgroundColor: index % 2 === 0 ? '#f7fafc' : 'white',
+          backgroundColor: isActive ? '#bee3f8' : (index % 2 === 0 ? '#f7fafc' : 'white'),
           cursor: 'pointer'
         }}
         onClick={() => onPreview(file)}

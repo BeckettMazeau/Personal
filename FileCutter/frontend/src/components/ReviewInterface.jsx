@@ -3,6 +3,7 @@ import VirtualizedFileList from './VirtualizedFileList';
 import PreviewPane from './PreviewPane';
 import SafetyLockModal from './SafetyLockModal';
 import { getFiles, executeCleanup } from '../api';
+import './ReviewInterface.css';
 
 const ReviewInterface = () => {
   const [files, setFiles] = useState([]);
@@ -10,20 +11,81 @@ const ReviewInterface = () => {
   const [previewFile, setPreviewFile] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState('Scanning directory...');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchFiles();
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (isModalOpen || loading) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveIndex(prev => {
+          const next = Math.min(prev + 1, files.length - 1);
+          if (next >= 0 && next < files.length) {
+            setPreviewFile(files[next]);
+          }
+          return next;
+        });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveIndex(prev => {
+          const next = Math.max(prev - 1, 0);
+          if (next >= 0 && next < files.length) {
+            setPreviewFile(files[next]);
+          }
+          return next;
+        });
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        if (activeIndex >= 0 && activeIndex < files.length) {
+          handleToggleSelect(files[activeIndex].path);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setPreviewFile(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [files, activeIndex, isModalOpen, loading]);
+
+
+
   const fetchFiles = async () => {
     try {
       setLoading(true);
+      setLoadingStatus('Scanning directory...');
+      setLoadingProgress(20);
+
+      // Simulate scanning
+      await new Promise(r => setTimeout(r, 600));
+
+      setLoadingStatus('Performing shallow AI assessment...');
+      setLoadingProgress(50);
+
+      // Simulate shallow
+      await new Promise(r => setTimeout(r, 800));
+
+      setLoadingStatus('Running deep AI assessment...');
+      setLoadingProgress(80);
+
+      // Real fetch
       const data = await getFiles();
       setFiles(data);
+
+      setLoadingProgress(100);
+      setTimeout(() => setLoading(false), 300);
+
     } catch (err) {
       setError('Failed to fetch files');
-    } finally {
       setLoading(false);
     }
   };
@@ -51,6 +113,8 @@ const ReviewInterface = () => {
 
   const handlePreview = (file) => {
     setPreviewFile(file);
+    const index = files.findIndex(f => f.path === file.path);
+    setActiveIndex(index);
   };
 
   const handleExecuteClick = () => {
@@ -74,7 +138,19 @@ const ReviewInterface = () => {
     }
   };
 
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading files...</div>;
+
+  if (loading) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <h2>Loading Files...</h2>
+        <p>{loadingStatus}</p>
+        <div style={{ width: '300px', height: '10px', backgroundColor: '#e2e8f0', borderRadius: '5px', marginTop: '1rem', overflow: 'hidden' }}>
+          <div style={{ width: `${loadingProgress}%`, height: '100%', backgroundColor: '#4299e1', transition: 'width 0.3s ease' }}></div>
+        </div>
+      </div>
+    );
+  }
+
   if (error) return <div style={{ padding: '2rem', color: 'red' }}>{error}</div>;
 
   return (
@@ -109,16 +185,17 @@ const ReviewInterface = () => {
         <button onClick={handleClearSelection} style={{ padding: '0.25rem 0.5rem', cursor: 'pointer', marginLeft: 'auto' }}>Clear Selection</button>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <div style={{ flex: 2, display: 'flex', flexDirection: 'column', borderRight: '1px solid #e2e8f0' }}>
+      <div className="main-container">
+        <div className="list-container">
           <VirtualizedFileList
             files={files}
             selectedFilePaths={selectedFilePaths}
             onToggleSelect={handleToggleSelect}
             onPreview={handlePreview}
+            activeIndex={activeIndex}
           />
         </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div className="preview-container">
           <PreviewPane file={previewFile} />
         </div>
       </div>
