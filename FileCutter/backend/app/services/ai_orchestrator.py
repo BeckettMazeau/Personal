@@ -13,11 +13,46 @@ from app.core.utils import get_optimal_batch_size, batch_files
 
 logger = logging.getLogger(__name__)
 
+
+import json
+import os
+
+class SettingsManager:
+    def __init__(self, config_file: str = "config.json"):
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        self.config_file = os.path.join(base_dir, config_file)
+
+    def get_selected_model(self) -> str:
+        if os.path.exists(self.config_file):
+            try:
+                with open(self.config_file, "r") as f:
+                    data = json.load(f)
+                    return data.get("selected_model", "local-model")
+            except Exception as e:
+                logger.error(f"Error reading config: {e}")
+        return "local-model"
+
+    def set_selected_model(self, model_id: str):
+        data = {}
+        if os.path.exists(self.config_file):
+            try:
+                with open(self.config_file, "r") as f:
+                    data = json.load(f)
+            except Exception:
+                pass
+        data["selected_model"] = model_id
+        try:
+            with open(self.config_file, "w") as f:
+                json.dump(data, f, indent=4)
+        except Exception as e:
+            logger.error(f"Error saving config: {e}")
+
 class AIOrchestrator:
     def __init__(self, lm_studio_url: str = settings.lm_studio_url):
         self.lm_studio_url = lm_studio_url
         self.timeout = aiohttp.ClientTimeout(total=60)
         self.cache_db = "file_cache.db"
+        self.settings_manager = SettingsManager()
         self._init_cache()
 
     def _init_cache(self):
@@ -31,6 +66,27 @@ class AIOrchestrator:
         ''')
         conn.commit()
         conn.close()
+
+
+    async def get_available_models(self) -> List[str]:
+        # lm_studio_url is typically http://localhost:1234/v1/chat/completions
+        # we need to get http://localhost:1234/v1/models
+        from urllib.parse import urlparse
+
+        parsed_url = urlparse(self.lm_studio_url)
+        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        models_url = f"{base_url}/v1/models"
+
+        try:
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                async with session.get(models_url) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    models = [model["id"] for model in data.get("data", []) if "id" in model]
+                    return models
+        except Exception as e:
+            logger.error(f"Error fetching models: {e}")
+            return ["local-model"]
 
     def _get_file_hash(self, filepath: str) -> str:
         if not os.path.exists(filepath):
@@ -73,8 +129,9 @@ class AIOrchestrator:
 
     async def _call_llm(self, messages: List[Dict[str, str]], response_format: Optional[Dict] = None) -> Optional[str]:
         """Helper to call LM Studio REST API with error handling and timeout."""
+        selected_model = self.settings_manager.get_selected_model()
         payload = {
-            "model": "local-model",
+            "model": selected_model,
             "messages": messages,
             "temperature": 0.1,
         }
