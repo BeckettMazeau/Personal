@@ -1,7 +1,9 @@
 import send2trash
 import secrets
+import logging
 from typing import List
 
+logger = logging.getLogger(__name__)
 
 class SecureDeletionManager:
     """
@@ -38,8 +40,10 @@ class SecureDeletionManager:
         for file_path in file_paths:
             try:
                 # Strictly using send2trash for safety
+                logger.info(f"Sending file to trash: {file_path}")
                 send2trash.send2trash(file_path)
-            except Exception:
+            except Exception as e:
+                logger.error(f"Failed to send file to trash: {file_path}. Error: {e}")
                 failed_deletions.append(file_path)
 
         return failed_deletions
