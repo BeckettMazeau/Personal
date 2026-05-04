@@ -1,7 +1,8 @@
 import unittest
 import os
 from unittest.mock import patch, MagicMock
-from app.core.safety import SecureDeletionManager, SERVER_SIDE_SECRET
+from app.core.safety import SecureDeletionManager
+from app.core.config import settings
 
 
 class TestSecureDeletionManager(unittest.TestCase):
@@ -15,7 +16,7 @@ class TestSecureDeletionManager(unittest.TestCase):
         mock_exists.return_value = True
         mock_isfile.return_value = True
 
-        result = manager.delete_files(test_paths, SERVER_SIDE_SECRET)
+        result = manager.delete_files(test_paths, settings.confirmation_token_secret)
 
         self.assertEqual(result["deleted_count"], 2)
         mock_send2trash.assert_any_call(test_paths[0])
@@ -40,7 +41,7 @@ class TestSecureDeletionManager(unittest.TestCase):
          mock_exists.side_effect = [True, False]
          mock_isfile.side_effect = [True] # Only called for the existing one
 
-         result = manager.delete_files(test_paths, SERVER_SIDE_SECRET)
+         result = manager.delete_files(test_paths, settings.confirmation_token_secret)
 
          self.assertEqual(result["deleted_count"], 1)
          mock_send2trash.assert_called_once_with(test_paths[0])

@@ -5,3 +5,4 @@ send2trash
 pymupdf
 aiohttp
 python-pptx
+pydantic-settings

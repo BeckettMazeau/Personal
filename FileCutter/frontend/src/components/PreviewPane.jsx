@@ -9,23 +9,23 @@ const PreviewPane = ({ file }) => {
     );
   }
 
-  const { name, url, type } = file;
+  const { filename, url, type } = file;
 
   const renderPreview = () => {
     if (!type) return <p>Unknown file type</p>;
 
     if (type.startsWith('image/')) {
-      return <img src={url} alt={name} style={{ maxWidth: '100%', maxHeight: '100%' }} />;
+      return <img src={url} alt={filename} style={{ maxWidth: '100%', maxHeight: '100%' }} />;
     }
 
     if (type === 'application/pdf') {
-      return <iframe src={url} title={name} style={{ width: '100%', height: '100%', border: 'none' }} />;
+      return <iframe src={url} title={filename} style={{ width: '100%', height: '100%', border: 'none' }} />;
     }
 
     return (
       <div className="unsupported-preview">
         <p>Preview not supported for this file type.</p>
-        <p>Filename: {name}</p>
+        <p>Filename: {filename}</p>
       </div>
     );
   };

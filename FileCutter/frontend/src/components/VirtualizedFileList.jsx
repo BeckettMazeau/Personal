@@ -2,7 +2,7 @@ import React from 'react';
 import { FixedSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 
-const VirtualizedFileList = ({ files, selectedFileIds, onToggleSelect, onPreview }) => {
+const VirtualizedFileList = ({ files, selectedFilePaths, onToggleSelect, onPreview }) => {
 
   const getConfidenceColor = (level) => {
     switch(level) {
@@ -13,17 +13,17 @@ const VirtualizedFileList = ({ files, selectedFileIds, onToggleSelect, onPreview
     }
   };
 
-  const formatSize = (bytes) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  const formatSize = (sizeMb) => {
+    if (sizeMb === 0) return '0 MB';
+    if (sizeMb < 1) {
+      return (sizeMb * 1024).toFixed(2) + ' KB';
+    }
+    return sizeMb.toFixed(2) + ' MB';
   };
 
   const Row = ({ index, style }) => {
     const file = files[index];
-    const isSelected = selectedFileIds.has(file.id);
+    const isSelected = selectedFilePaths.has(file.path);
 
     return (
       <div
@@ -42,25 +42,25 @@ const VirtualizedFileList = ({ files, selectedFileIds, onToggleSelect, onPreview
           <input
             type="checkbox"
             checked={isSelected}
-            onChange={() => onToggleSelect(file.id)}
+            onChange={() => onToggleSelect(file.path)}
           />
         </div>
         <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {file.name}
+          {file.filename}
         </div>
         <div style={{ width: '100px', textAlign: 'right', color: '#718096', fontSize: '0.875rem' }}>
-          {formatSize(file.size)}
+          {formatSize(file.size_mb)}
         </div>
         <div style={{ width: '120px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <span style={{
             display: 'inline-block',
             width: '12px', height: '12px',
             borderRadius: '50%',
-            backgroundColor: getConfidenceColor(file.confidence),
+            backgroundColor: getConfidenceColor(file.confidence_score),
             marginRight: '0.5rem'
           }}></span>
-          <span style={{ fontSize: '0.875rem', fontWeight: 'bold', color: getConfidenceColor(file.confidence) }}>
-            Level {file.confidence}
+          <span style={{ fontSize: '0.875rem', fontWeight: 'bold', color: getConfidenceColor(file.confidence_score) }}>
+            Level {file.confidence_score}
           </span>
         </div>
       </div>
