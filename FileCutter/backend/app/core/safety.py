@@ -1,4 +1,5 @@
 import os
+from app.core.config import settings
 import send2trash
 import logging
 from typing import List
@@ -6,7 +7,7 @@ from typing import List
 logger = logging.getLogger(__name__)
 
 # Load secret from environment variables
-SERVER_SIDE_SECRET = os.getenv("CONFIRMATION_TOKEN_SECRET", "super_secret_confirmation_token_123")
+SERVER_SIDE_SECRET = settings.confirmation_token_secret
 
 class SecureDeletionManager:
     """
@@ -17,8 +18,6 @@ class SecureDeletionManager:
     is expressly PROHIBITED to ensure safety and allow user recovery of files.
     """
 
-    def __init__(self):
-        pass
 
     def delete_files(self, file_paths: List[str], confirmation_token: str):
         """

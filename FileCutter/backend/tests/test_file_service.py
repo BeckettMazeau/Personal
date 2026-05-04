@@ -2,8 +2,9 @@ import unittest
 import asyncio
 import os
 from unittest.mock import patch, MagicMock
-from app.services.file_service import scan_directory, batch_files
-from app.models.file_model import FileObject, FileSource
+from app.services.file_service import scan_directory
+from app.core.utils import batch_files
+from app.models.schemas import FileObject, FileSource
 
 class TestFileService(unittest.TestCase):
 

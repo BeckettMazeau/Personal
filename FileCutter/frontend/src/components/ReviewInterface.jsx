@@ -6,7 +6,7 @@ import { getFiles, executeCleanup } from '../api';
 
 const ReviewInterface = () => {
   const [files, setFiles] = useState([]);
-  const [selectedFileIds, setSelectedFileIds] = useState(new Set());
+  const [selectedFilePaths, setSelectedFilePaths] = useState(new Set());
   const [previewFile, setPreviewFile] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -28,25 +28,25 @@ const ReviewInterface = () => {
     }
   };
 
-  const handleToggleSelect = (fileId) => {
-    setSelectedFileIds(prev => {
+  const handleToggleSelect = (filePath) => {
+    setSelectedFilePaths(prev => {
       const next = new Set(prev);
-      if (next.has(fileId)) {
-        next.delete(fileId);
+      if (next.has(filePath)) {
+        next.delete(filePath);
       } else {
-        next.add(fileId);
+        next.add(filePath);
       }
       return next;
     });
   };
 
   const handleSelectByConfidence = (level) => {
-    const ids = files.filter(f => f.confidence === level).map(f => f.id);
-    setSelectedFileIds(new Set(ids));
+    const ids = files.filter(f => f.confidence_score === level).map(f => f.path);
+    setSelectedFilePaths(new Set(ids));
   };
 
   const handleClearSelection = () => {
-    setSelectedFileIds(new Set());
+    setSelectedFilePaths(new Set());
   };
 
   const handlePreview = (file) => {
@@ -54,7 +54,7 @@ const ReviewInterface = () => {
   };
 
   const handleExecuteClick = () => {
-    if (selectedFileIds.size > 0) {
+    if (selectedFilePaths.size > 0) {
       setIsModalOpen(true);
     }
   };
@@ -63,10 +63,10 @@ const ReviewInterface = () => {
     setIsModalOpen(false);
     try {
       const confirmationToken = "some-secure-token"; // This would typically come from an auth context or previous step
-      await executeCleanup(Array.from(selectedFileIds), confirmationToken);
+      await executeCleanup(Array.from(selectedFilePaths), confirmationToken);
       // Refresh list or remove deleted files from state
-      setFiles(files.filter(f => !selectedFileIds.has(f.id)));
-      setSelectedFileIds(new Set());
+      setFiles(files.filter(f => !selectedFilePaths.has(f.path)));
+      setSelectedFilePaths(new Set());
       setPreviewFile(null);
       alert('Cleanup executed successfully');
     } catch (err) {
@@ -82,17 +82,17 @@ const ReviewInterface = () => {
       <header style={{ padding: '1rem', backgroundColor: '#2d3748', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>FileCutter Review</h1>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.875rem' }}>{selectedFileIds.size} files selected</span>
+          <span style={{ fontSize: '0.875rem' }}>{selectedFilePaths.size} files selected</span>
           <button
             onClick={handleExecuteClick}
-            disabled={selectedFileIds.size === 0}
+            disabled={selectedFilePaths.size === 0}
             style={{
               padding: '0.5rem 1rem',
-              backgroundColor: selectedFileIds.size > 0 ? '#e53e3e' : '#fc8181',
+              backgroundColor: selectedFilePaths.size > 0 ? '#e53e3e' : '#fc8181',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              cursor: selectedFileIds.size > 0 ? 'pointer' : 'not-allowed',
+              cursor: selectedFilePaths.size > 0 ? 'pointer' : 'not-allowed',
               fontWeight: 'bold'
             }}
           >
@@ -113,7 +113,7 @@ const ReviewInterface = () => {
         <div style={{ flex: 2, display: 'flex', flexDirection: 'column', borderRight: '1px solid #e2e8f0' }}>
           <VirtualizedFileList
             files={files}
-            selectedFileIds={selectedFileIds}
+            selectedFilePaths={selectedFilePaths}
             onToggleSelect={handleToggleSelect}
             onPreview={handlePreview}
           />
@@ -125,7 +125,7 @@ const ReviewInterface = () => {
 
       <SafetyLockModal
         isOpen={isModalOpen}
-        fileCount={selectedFileIds.size}
+        fileCount={selectedFilePaths.size}
         onConfirm={handleConfirmExecute}
         onCancel={() => setIsModalOpen(false)}
       />

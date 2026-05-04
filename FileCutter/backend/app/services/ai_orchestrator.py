@@ -6,11 +6,12 @@ import aiohttp
 import fitz  # PyMuPDF
 from pptx import Presentation
 import os
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 class AIOrchestrator:
-    def __init__(self, lm_studio_url: str = "http://localhost:1234/v1/chat/completions"):
+    def __init__(self, lm_studio_url: str = settings.lm_studio_url):
         self.lm_studio_url = lm_studio_url
         self.timeout = aiohttp.ClientTimeout(total=60)
 
@@ -126,6 +127,12 @@ class AIOrchestrator:
     async def tier_2_evaluation(self, filepath: str) -> Dict[str, Any]:
         """Deep Pass: Extract text and evaluate content contextually."""
         text = self._extract_text(filepath)
+
+        lower_path = filepath.lower()
+        lower_content = text.lower()
+        if "homework" in lower_path or "homework" in lower_content or "report" in lower_path or "report" in lower_content:
+            logger.info(f"Protected item detected: {filepath}")
+            return {"filename": os.path.basename(filepath), "delete": False, "confidence": 1, "reasoning": "Protected item detected by static rule (homework/report)."}
 
         if not text.strip():
             return {

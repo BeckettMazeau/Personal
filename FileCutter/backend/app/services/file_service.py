@@ -1,12 +1,22 @@
 import os
 import asyncio
+import logging
 from typing import List, Tuple
-from app.models.file_model import FileObject, FileSource
+from app.models.schemas import FileObject, FileSource
+
+logger = logging.getLogger(__name__)
 
 STATIC_EXTENSIONS = {'.exe', '.msi', '.dmg', '.pkg', '.tmp'}
 
 async def scan_directory(directory: str) -> List[FileObject]:
-    """Asynchronously scans a directory and applies static triaging."""
+    """Asynchronously scans a directory and applies static triaging.
+
+    Args:
+        directory (str): The root directory to scan.
+
+    Returns:
+        List[FileObject]: A list of triaged FileObject instances.
+    """
     def _scan() -> List[FileObject]:
         files_found = []
         for root, _, files in os.walk(directory):
@@ -31,12 +41,7 @@ async def scan_directory(directory: str) -> List[FileObject]:
                     )
                     files_found.append(file_obj)
                 except OSError as e:
-                    print(f"Error accessing {file_path}: {e}")
-                    # Could log this instead
+                    logger.error(f"Error accessing {file_path}: {e}")
         return files_found
 
     return await asyncio.to_thread(_scan)
-
-def batch_files(files: List[FileObject], batch_size: int = 20) -> List[List[FileObject]]:
-    """Chunks a list of files into batches of a specified size."""
-    return [files[i:i + batch_size] for i in range(0, len(files), batch_size)]
