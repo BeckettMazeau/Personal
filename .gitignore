@@ -1,3 +1,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+dummy_downloads/
+FileCutter/tests/e2e/dummy_downloads/
+playwright-report/
+test-results/
