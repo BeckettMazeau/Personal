@@ -1,0 +1,30 @@
+
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+      - /:/host_fs:ro # Allow read-only access to host filesystem
+    ports:
+      - "8000:8000"
+    environment:
+      - TARGET_DOWNLOADS_PATH=/host_fs/Downloads
+      - LM_STUDIO_API_BASE=http://host.docker.internal:1234/v1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
