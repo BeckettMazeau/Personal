@@ -1,5 +1,6 @@
 import unittest
 import asyncio
+from unittest.mock import patch
 from app.services.ai_orchestrator import AIOrchestrator
 
 class TestAIOrchestrator(unittest.TestCase):
@@ -21,6 +22,19 @@ class TestAIOrchestrator(unittest.TestCase):
         self.assertEqual(result["delete"], False)
         self.assertEqual(result["confidence"], 1)
         self.assertIn("Protected item", result["reasoning"])
+
+    @patch("app.services.ai_orchestrator.aiohttp.ClientSession.post")
+    def test_call_llm_timeout(self, mock_post):
+        mock_post.side_effect = asyncio.TimeoutError("Timeout")
+        result = asyncio.run(self.orchestrator._call_llm([{"role": "user", "content": "test"}]))
+        self.assertIsNone(result)
+
+    @patch("app.services.ai_orchestrator.aiohttp.ClientSession.post")
+    def test_call_llm_client_error(self, mock_post):
+        import aiohttp
+        mock_post.side_effect = aiohttp.ClientError("Client error")
+        result = asyncio.run(self.orchestrator._call_llm([{"role": "user", "content": "test"}]))
+        self.assertIsNone(result)
 
 if __name__ == "__main__":
     unittest.main()

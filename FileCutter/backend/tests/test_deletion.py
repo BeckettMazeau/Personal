@@ -47,5 +47,28 @@ class TestSecureDeletionManager(unittest.TestCase):
          mock_send2trash.assert_called_once_with(test_paths[0])
 
 
+    @patch("app.core.safety.send2trash.send2trash")
+    @patch("app.core.safety.os.path.exists")
+    @patch("app.core.safety.os.path.isfile")
+    @patch("app.core.safety.os.remove")
+    @patch("app.core.safety.os.unlink")
+    @patch("shutil.rmtree")
+    def test_delete_files_safety_check(self, mock_rmtree, mock_unlink, mock_remove, mock_isfile, mock_exists, mock_send2trash):
+        manager = SecureDeletionManager()
+        test_paths = ["/path/to/test/file1.txt"]
+
+        mock_exists.return_value = True
+        mock_isfile.return_value = True
+
+        result = manager.delete_files(test_paths, settings.confirmation_token_secret)
+
+        self.assertEqual(result["deleted_count"], 1)
+        mock_send2trash.assert_called_once_with(test_paths[0])
+
+        # Explicitly check that forbidden functions are never called
+        mock_remove.assert_not_called()
+        mock_unlink.assert_not_called()
+        mock_rmtree.assert_not_called()
+
 if __name__ == "__main__":
     unittest.main()
