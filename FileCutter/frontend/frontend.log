@@ -1,0 +1,10 @@
+
+> frontend@1.0.0 dev
+> vite
+
+
+  VITE v8.0.10  ready in 336 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+7:03:09 PM [vite] (client) hmr update /src/components/ReviewInterface.jsx
