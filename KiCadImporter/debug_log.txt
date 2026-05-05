@@ -1,0 +1,26 @@
+2026-05-05 00:10:59,228 - src.gui.controller - INFO - Application state loaded.
+2026-05-05 00:11:06,883 - src.gui.controller - DEBUG - Starting ProcessingWorker for: C:/Users/becke/Downloads/UJ20_C_H_G_SMT_1_P16_TR.zip
+2026-05-05 00:11:06,889 - src.gui.controller - DEBUG - Archive extracted to workspace: C:\Users\becke\AppData\Local\Temp\kicad_workspace_s4xwblz9
+2026-05-05 00:11:06,890 - src.gui.controller - DEBUG - Identified files: {'.kicad_sym': [WindowsPath('C:/Users/becke/AppData/Local/Temp/kicad_workspace_s4xwblz9/UJ20-C-H-G-SMT-1-P16-TR.kicad_sym')], '.kicad_mod': [WindowsPath('C:/Users/becke/AppData/Local/Temp/kicad_workspace_s4xwblz9/SAMESKY_UJ20-C-H-G-SMT-1-P16-TR.kicad_mod')]}
+2026-05-05 00:11:06,890 - src.gui.controller - DEBUG - Suggested part name: UJ20-C-H-G-SMT-1-P16-TR
+2026-05-05 00:11:06,891 - src.gui.controller - DEBUG - Created preview directory at: C:\Users\becke\AppData\Local\Temp\kicad_workspace_s4xwblz9\previews
+2026-05-05 00:11:06,891 - src.gui.controller - DEBUG - Attempting to generate symbol preview for C:\Users\becke\AppData\Local\Temp\kicad_workspace_s4xwblz9\UJ20-C-H-G-SMT-1-P16-TR.kicad_sym
+2026-05-05 00:11:07,284 - src.gui.controller - DEBUG - Symbol preview generation result: success=True, error=None, output_files=['C:\\Users\\becke\\AppData\\Local\\Temp\\kicad_workspace_s4xwblz9\\previews\\UJ20-C-H-G-SMT-1-P16-TR_sym.svg']
+2026-05-05 00:11:07,284 - src.gui.controller - DEBUG - Symbol CLI Logs:
+STDOUT:
+Plotting symbol 'UJ20-C-H-G-SMT-1-P16-TR' unit 1 to 'C:\Users\becke\AppData\Local\Temp\kicad_workspace_s4xwblz9\previews\UJ20-C-H-G-SMT-1-P16-TR_sym.svg\UJ20-C-H-G-SMT-1-P16-TR_unit1.svg'
+
+STDERR:
+
+2026-05-05 00:11:07,285 - src.gui.controller - ERROR - Failed to copy debug preview: [Errno 13] Permission denied: 'C:\\Users\\becke\\AppData\\Local\\Temp\\kicad_workspace_s4xwblz9\\previews\\UJ20-C-H-G-SMT-1-P16-TR_sym.svg'
+2026-05-05 00:11:07,285 - src.gui.controller - DEBUG - Attempting to generate footprint preview for C:\Users\becke\AppData\Local\Temp\kicad_workspace_s4xwblz9\SAMESKY_UJ20-C-H-G-SMT-1-P16-TR.kicad_mod
+2026-05-05 00:11:07,578 - src.gui.controller - DEBUG - Footprint preview generation result: success=False, error=KiCad-CLI export failed (Exit Code 3)., output_files=[]
+2026-05-05 00:11:07,578 - src.gui.controller - DEBUG - Footprint CLI Logs:
+STDOUT:
+
+STDERR:
+Footprint library does not exist or is not accessible
+
+2026-05-05 00:11:07,578 - src.gui.controller - DEBUG - ProcessingWorker finished successfully for UJ20-C-H-G-SMT-1-P16-TR
+2026-05-05 00:11:33,015 - src.backend.config_manager - DEBUG - Configuration successfully saved to C:\Users\becke\.kicad_import_tool\config.json
+2026-05-05 00:11:33,015 - src.gui.controller - INFO - Application state saved.

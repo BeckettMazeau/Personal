@@ -4,7 +4,6 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt
 from src.backend.config_manager import instance as config
 from src.backend.env_parser import get_kicad_libraries
-from src.gui.library_browser import LibraryBrowser
 
 class SettingsDialog(QDialog):
     """
@@ -53,12 +52,26 @@ class SettingsDialog(QDialog):
         form.addRow("Application Theme:", self.theme_combo)
         
         # 4. Default Symbol Library
-        self.sym_lib_browser = LibraryBrowser("Default Symbol Library:")
-        form.addRow(self.sym_lib_browser)
+        self.sym_lib_edit = QLineEdit()
+        self.sym_lib_edit.setPlaceholderText("Default symbol library (.kicad_sym)...")
+        self.sym_lib_btn = QPushButton("Browse...")
+        self.sym_lib_btn.clicked.connect(self._browse_sym_lib)
+        
+        sym_layout = QHBoxLayout()
+        sym_layout.addWidget(self.sym_lib_edit)
+        sym_layout.addWidget(self.sym_lib_btn)
+        form.addRow("Default Symbol Library:", sym_layout)
         
         # 5. Default Footprint Library
-        self.fp_lib_browser = LibraryBrowser("Default Footprint Library:")
-        form.addRow(self.fp_lib_browser)
+        self.fp_lib_edit = QLineEdit()
+        self.fp_lib_edit.setPlaceholderText("Default footprint library (.pretty dir)...")
+        self.fp_lib_btn = QPushButton("Browse...")
+        self.fp_lib_btn.clicked.connect(self._browse_fp_lib)
+        
+        fp_layout = QHBoxLayout()
+        fp_layout.addWidget(self.fp_lib_edit)
+        fp_layout.addWidget(self.fp_lib_btn)
+        form.addRow("Default Footprint Library:", fp_layout)
         
         layout.addLayout(form)
         
@@ -75,14 +88,7 @@ class SettingsDialog(QDialog):
         self.button_box.rejected.connect(self.reject)
         layout.addWidget(self.button_box)
 
-        # Populate searchable library browsers with current KiCad environment data
-        try:
-            syms, fps = get_kicad_libraries()
-            self.sym_lib_browser.set_libraries(syms)
-            self.fp_lib_browser.set_libraries(fps)
-        except Exception:
-            # Silently handle parsing errors; library browsers will remain empty or handle internally
-            pass
+
 
     def _browse_dup_dir(self):
         """Opens a directory picker for the duplication location."""
@@ -98,6 +104,18 @@ class SettingsDialog(QDialog):
         if file_path:
             self.kicad_cli_edit.setText(file_path)
 
+    def _browse_sym_lib(self):
+        from src.gui.library_browser import AdvancedLibraryBrowser
+        dialog = AdvancedLibraryBrowser(lib_type="symbol", parent=self)
+        dialog.librarySelected.connect(lambda path: self.sym_lib_edit.setText(path))
+        dialog.exec()
+
+    def _browse_fp_lib(self):
+        from src.gui.library_browser import AdvancedLibraryBrowser
+        dialog = AdvancedLibraryBrowser(lib_type="footprint", parent=self)
+        dialog.librarySelected.connect(lambda path: self.fp_lib_edit.setText(path))
+        dialog.exec()
+
     def load_settings(self):
         """Loads persistent values from the ConfigManager into the UI widgets."""
         self.dup_dir_edit.setText(config.get("last_duplication_directory", ""))
@@ -105,8 +123,8 @@ class SettingsDialog(QDialog):
         self.theme_combo.setCurrentText(config.get("theme", "System"))
         
         # Sync default library selections
-        self.sym_lib_browser.set_selected_path(config.get("last_used_symbol_lib_path", ""))
-        self.fp_lib_browser.set_selected_path(config.get("last_used_footprint_lib_path", ""))
+        self.sym_lib_edit.setText(config.get("last_used_symbol_lib_path", ""))
+        self.fp_lib_edit.setText(config.get("last_used_footprint_lib_path", ""))
 
     def save_settings(self):
         """Validates and persists the current UI values to disk via ConfigManager."""
@@ -115,8 +133,8 @@ class SettingsDialog(QDialog):
         config.set("theme", self.theme_combo.currentText())
         
         # Persist library selections
-        config.set("last_used_symbol_lib_path", self.sym_lib_browser.get_selected_path())
-        config.set("last_used_footprint_lib_path", self.fp_lib_browser.get_selected_path())
+        config.set("last_used_symbol_lib_path", self.sym_lib_edit.text())
+        config.set("last_used_footprint_lib_path", self.fp_lib_edit.text())
         
         if config.save():
             self.accept()

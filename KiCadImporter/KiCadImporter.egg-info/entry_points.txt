@@ -1,0 +1,2 @@
+[console_scripts]
+kicad-importer = src.main:main

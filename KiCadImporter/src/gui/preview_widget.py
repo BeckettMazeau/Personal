@@ -1,11 +1,68 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QTabWidget
-from PyQt6.QtSvgWidgets import QSvgWidget
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTabWidget
+from PyQt6.QtSvg import QSvgRenderer
+from PyQt6.QtCore import Qt, QRectF
+from PyQt6.QtGui import QPainter
 import pathlib
+
+
+class SvgScalingWidget(QWidget):
+    """
+    Custom widget that renders an SVG scaled to fit the available space
+    while maintaining aspect ratio. Supports zoom via a zoom_factor.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.renderer = QSvgRenderer()
+        self.zoom_factor = 1.0
+
+    def load(self, path: str):
+        self.renderer.load(path)
+        self.update()
+
+    def clear(self):
+        self.renderer = QSvgRenderer()
+        self.update()
+
+    def paintEvent(self, event):
+        if not self.renderer.isValid():
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Get SVG default size and widget size
+        svg_size = self.renderer.defaultSize()
+        widget_w = self.width()
+        widget_h = self.height()
+
+        if svg_size.width() <= 0 or svg_size.height() <= 0:
+            return
+
+        # Calculate scale to fit widget, preserving aspect ratio
+        scale_x = widget_w / svg_size.width()
+        scale_y = widget_h / svg_size.height()
+        base_scale = min(scale_x, scale_y)
+
+        # Apply user zoom on top of the fit-to-window scale
+        scale = base_scale * self.zoom_factor
+
+        # Calculate the rendered size
+        render_w = svg_size.width() * scale
+        render_h = svg_size.height() * scale
+
+        # Center the SVG in the widget
+        x = (widget_w - render_w) / 2
+        y = (widget_h - render_h) / 2
+
+        target = QRectF(x, y, render_w, render_h)
+        self.renderer.render(painter, target)
+        painter.end()
+
 
 class PreviewWidget(QWidget):
     """
     Widget to display SVG previews of KiCad symbols and footprints.
+    Automatically scales content to fit the available space.
     """
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -19,18 +76,12 @@ class PreviewWidget(QWidget):
         self.tabs = QTabWidget()
         
         # Symbol Preview
-        self.symbol_scroll = QScrollArea()
-        self.symbol_scroll.setWidgetResizable(True)
-        self.symbol_svg = QSvgWidget()
-        self.symbol_scroll.setWidget(self.symbol_svg)
-        self.tabs.addTab(self.symbol_scroll, "Symbol")
+        self.symbol_svg = SvgScalingWidget()
+        self.tabs.addTab(self.symbol_svg, "Symbol")
 
         # Footprint Preview
-        self.footprint_scroll = QScrollArea()
-        self.footprint_scroll.setWidgetResizable(True)
-        self.footprint_svg = QSvgWidget()
-        self.footprint_scroll.setWidget(self.footprint_svg)
-        self.tabs.addTab(self.footprint_scroll, "Footprint")
+        self.footprint_svg = SvgScalingWidget()
+        self.tabs.addTab(self.footprint_svg, "Footprint")
 
         layout.addWidget(QLabel("Component Preview:"))
         
@@ -50,23 +101,11 @@ class PreviewWidget(QWidget):
 
         self.zoom_factor = 1.0
 
-    def update_from_task(self, task: ImportTask):
+    def update_from_task(self, task):
         """
         Updates the preview based on an ImportTask.
-        Note: This assumes the SVGs have been generated and paths are known.
-        In this implementation, we look for .svg files in a 'previews' subfolder 
-        of the temp workspace, or provided via some mechanism.
-        
-        For the purpose of this component, we expect the caller to have 
-        populated paths or we use a convention.
+        Placeholder — the orchestrator calls load_previews directly.
         """
-        # Placeholder logic: in a real integration, the paths would be 
-        # retrieved from a cache or the ImportTask would have them.
-        # Since I can't modify models.py, I'll assume they might be 
-        # added to the task dynamically or managed externally.
-        
-        # For now, we'll just expose the load_previews method and 
-        # assume the orchestrator calls it.
         pass
 
     def load_previews(self, symbol_svg_path: str = None, footprint_svg_path: str = None):
@@ -81,17 +120,17 @@ class PreviewWidget(QWidget):
         if symbol_svg_path and pathlib.Path(symbol_svg_path).exists():
             self.symbol_svg.load(symbol_svg_path)
             self.tabs.setTabEnabled(0, True)
-            self.symbol_svg.adjustSize()
             has_content = True
         else:
+            self.symbol_svg.clear()
             self.tabs.setTabEnabled(0, False)
 
         if footprint_svg_path and pathlib.Path(footprint_svg_path).exists():
             self.footprint_svg.load(footprint_svg_path)
             self.tabs.setTabEnabled(1, True)
-            self.footprint_svg.adjustSize()
             has_content = True
         else:
+            self.footprint_svg.clear()
             self.tabs.setTabEnabled(1, False)
 
         if not has_content:
@@ -115,15 +154,10 @@ class PreviewWidget(QWidget):
 
     def _apply_zoom(self):
         self.zoom_label.setText(f"Zoom: {int(self.zoom_factor * 100)}%")
-        # To zoom, we resize the QSvgWidgets
-        # Note: QSvgWidget scales the content to its size
-        if self.tabs.isTabEnabled(0):
-            base_size = self.symbol_svg.renderer().defaultSize()
-            self.symbol_svg.setFixedSize(base_size * self.zoom_factor)
-        
-        if self.tabs.isTabEnabled(1):
-            base_size = self.footprint_svg.renderer().defaultSize()
-            self.footprint_svg.setFixedSize(base_size * self.zoom_factor)
+        self.symbol_svg.zoom_factor = self.zoom_factor
+        self.symbol_svg.update()
+        self.footprint_svg.zoom_factor = self.zoom_factor
+        self.footprint_svg.update()
 
     def wheelEvent(self, event):
         """Handle mouse wheel for zooming."""
@@ -144,3 +178,4 @@ class PreviewWidget(QWidget):
     def clear_preview(self):
         """Resets the preview display."""
         self.load_previews(None, None)
+

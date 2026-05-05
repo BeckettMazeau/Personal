@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: KiCadImporter
+Version: 1.0.0
+Summary: Standalone executable for the KiCad Import Tool
+Author: Beckett Mazeau
+Requires-Dist: PyQt6>=6.6.0
+Requires-Dist: pyinstaller>=6.0.0
+Dynamic: author
+Dynamic: requires-dist
+Dynamic: summary

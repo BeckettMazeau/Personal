@@ -35,7 +35,7 @@ class KiCadEnvParser:
 
     def _detect_kicad_installations(self):
         """Heuristically detects KiCad installation paths to populate missing environment variables."""
-        versions = ["8.0", "7.0", "6.0"]
+        versions = ["9.0", "8.0", "7.0", "6.0"]
         
         if platform.system() == "Windows":
             # Common Windows installation roots
@@ -108,7 +108,7 @@ class KiCadEnvParser:
             # Linux/Other POSIX
             search_roots.append(pathlib.Path("~/.config/kicad").expanduser())
             
-        versions = ["8.0", "7.0", "6.0"]
+        versions = ["9.0", "8.0", "7.0", "6.0"]
         for root in search_roots:
             if not root.exists():
                 continue

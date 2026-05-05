@@ -13,10 +13,13 @@ class ArchiveWorkspaceManager:
     
     This class ensures that extracted files are kept in a sandboxed temporary 
     directory which is automatically cleaned up.
+    
+    Multiple workspaces are maintained simultaneously so that previously
+    extracted archives remain accessible for preview rendering.
     """
 
     def __init__(self) -> None:
-        self._temp_dir_obj: Optional[tempfile.TemporaryDirectory] = None
+        self._workspaces: List[tempfile.TemporaryDirectory] = []
         self.workspace_path: Optional[pathlib.Path] = None
 
     def __enter__(self):
@@ -32,17 +35,18 @@ class ArchiveWorkspaceManager:
         """
         Extracts a .zip archive into a new temporary directory.
         
+        Previous workspaces are preserved so that their files (SVG previews,
+        source KiCad files) remain accessible for the UI.
+        
         Args:
             archive_path: Path to the .zip file.
             
         Returns:
             The absolute path to the temporary directory.
         """
-        # Ensure previous workspace is cleaned up if this is called multiple times
-        self.cleanup()
-        
-        self._temp_dir_obj = tempfile.TemporaryDirectory(prefix="kicad_workspace_")
-        self.workspace_path = pathlib.Path(self._temp_dir_obj.name).resolve()
+        temp_dir_obj = tempfile.TemporaryDirectory(prefix="kicad_workspace_")
+        self._workspaces.append(temp_dir_obj)
+        self.workspace_path = pathlib.Path(temp_dir_obj.name).resolve()
         
         with zipfile.ZipFile(archive_path, 'r') as zip_ref:
             zip_ref.extractall(self.workspace_path)
@@ -50,11 +54,14 @@ class ArchiveWorkspaceManager:
         return str(self.workspace_path)
 
     def cleanup(self):
-        """Explicitly cleans up the temporary workspace."""
-        if self._temp_dir_obj:
-            self._temp_dir_obj.cleanup()
-            self._temp_dir_obj = None
-            self.workspace_path = None
+        """Explicitly cleans up all temporary workspaces."""
+        for ws in self._workspaces:
+            try:
+                ws.cleanup()
+            except Exception:
+                pass
+        self._workspaces.clear()
+        self.workspace_path = None
 
     def identify_files(self) -> Dict[str, List[pathlib.Path]]:
         """
@@ -80,13 +87,18 @@ class ArchiveWorkspaceManager:
                     
         return results
 
-    def copy_to_target(self, source_path: pathlib.Path | str, target_dir: pathlib.Path | str) -> pathlib.Path:
+    def copy_to_target(self, source_path: pathlib.Path | str, target: pathlib.Path | str) -> pathlib.Path:
         """
-        Copies a file from the workspace to a target directory with collision detection.
+        Copies a file from the workspace to a target location with collision detection.
+        
+        The target parameter is interpreted intelligently:
+        - If target is an existing file or has a KiCad file extension (.kicad_sym, .kicad_mod),
+          the source file is copied into the target's *parent* directory.
+        - Otherwise target is treated as a directory path.
         
         Args:
             source_path: Absolute path to the source file (usually in the workspace).
-            target_dir: Absolute path to the destination directory.
+            target: Absolute path to the destination file or directory.
             
         Returns:
             The absolute pathlib.Path to the copied file.
@@ -96,10 +108,19 @@ class ArchiveWorkspaceManager:
             FileNotFoundError: If the source_path does not exist.
         """
         src = pathlib.Path(source_path)
-        dst_dir = pathlib.Path(target_dir)
+        target_path = pathlib.Path(target)
         
         if not src.exists():
             raise FileNotFoundError(f"Source file not found: {source_path}")
+
+        # Determine if the target is a file path or a directory path.
+        # If the target already exists as a file, or has a known KiCad file extension,
+        # treat it as a file path and use its parent as the destination directory.
+        kicad_file_extensions = {'.kicad_sym', '.kicad_mod'}
+        if target_path.is_file() or target_path.suffix.lower() in kicad_file_extensions:
+            dst_dir = target_path.parent
+        else:
+            dst_dir = target_path
             
         # Ensure target directory exists
         dst_dir.mkdir(parents=True, exist_ok=True)
@@ -108,7 +129,7 @@ class ArchiveWorkspaceManager:
         
         # Collision check
         if dst_path.exists():
-            raise FileCollisionError(f"Collision detected: File '{src.name}' already exists in '{target_dir}'")
+            raise FileCollisionError(f"Collision detected: File '{src.name}' already exists in '{dst_dir}'")
             
         # Perform the copy
         shutil.copy2(src, dst_path)

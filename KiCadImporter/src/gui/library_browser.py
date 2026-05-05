@@ -1,111 +1,184 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QComboBox, QCompleter, QLabel, QFrame
-from PyQt6.QtCore import pyqtSignal, Qt
-from typing import List, Dict, Optional
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, 
+                             QListWidget, QListWidgetItem, QPushButton, 
+                             QLabel, QFileDialog, QTabWidget)
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QIcon
+import pathlib
 
-class LibraryBrowser(QWidget):
-    """
-    A reusable searchable dropdown for selecting KiCad libraries.
-    Supports Symbol and Footprint library display with tooltips for full paths.
-    
-    This widget is used in the global settings and in the batch queue for individual part overrides.
-    """
-    libraryChanged = pyqtSignal(str)  # Emits the library path when changed
+from src.backend.config_manager import instance as config
 
-    def __init__(self, label_text: str = "Library:", parent=None):
+class AdvancedLibraryBrowser(QDialog):
+    """
+    A robust dialog for selecting KiCad libraries with Search, Pinned, and Recents functionality.
+    """
+    librarySelected = pyqtSignal(str)
+
+    def __init__(self, lib_type: str = "symbol", parent=None):
         super().__init__(parent)
-        self._libraries: List[Dict[str, str]] = []
-        self._setup_ui(label_text)
+        self.lib_type = lib_type # "symbol" or "footprint"
+        self.setWindowTitle(f"Select {lib_type.capitalize()} Library")
+        self.resize(600, 400)
+        
+        self.recent_key = f"recent_{lib_type}_libs"
+        self.pinned_key = f"pinned_{lib_type}_libs"
+        
+        self._setup_ui()
+        self._load_data()
 
-    def _setup_ui(self, label_text: str):
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
 
-        self.label = QLabel(label_text)
-        self.label.setMinimumWidth(150)
+        # Search bar
+        search_layout = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search libraries...")
+        self.search_input.textChanged.connect(self._filter_lists)
+        search_layout.addWidget(QLabel("Search:"))
+        search_layout.addWidget(self.search_input)
         
-        self.combo = QComboBox()
-        self.combo.setEditable(True)
-        self.combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        # Browse button
+        self.browse_btn = QPushButton("Browse System...")
+        self.browse_btn.clicked.connect(self._browse_system)
+        search_layout.addWidget(self.browse_btn)
         
-        # Set up completer for searching by nickname
-        self.completer = QCompleter()
-        self.completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
-        self.completer.setFilterMode(Qt.MatchFlag.MatchContains)
-        self.combo.setCompleter(self.completer)
-        
-        # Connect signals
-        self.combo.currentIndexChanged.connect(self._on_index_changed)
-        
-        layout.addWidget(self.label)
-        layout.addWidget(self.combo, 1)
+        layout.addLayout(search_layout)
 
-    def set_libraries(self, libraries: List[Dict[str, str]]):
-        """
-        Populates the dropdown with library nicknames and paths.
-        Expected format: [{"nickname": "...", "path": "..."}]
-        """
-        self._libraries = libraries
-        self.combo.clear()
+        # Tabs for Pinned and Recents
+        self.tabs = QTabWidget()
         
-        # Add a placeholder/none option if needed? 
-        # Requirement implies choosing from available.
+        # Pinned Tab
+        self.pinned_list = QListWidget()
+        self.pinned_list.itemDoubleClicked.connect(self._accept_selection)
+        self.tabs.addTab(self.pinned_list, "Pinned")
         
-        for lib in libraries:
-            nickname = lib.get("nickname", "Unknown")
-            path = lib.get("path", "")
-            self.combo.addItem(nickname, path)
+        # Recents Tab
+        self.recent_list = QListWidget()
+        self.recent_list.itemDoubleClicked.connect(self._accept_selection)
+        self.tabs.addTab(self.recent_list, "Recent")
+        
+        # All Tab
+        self.all_list = QListWidget()
+        self.all_list.itemDoubleClicked.connect(self._accept_selection)
+        self.tabs.addTab(self.all_list, "All Configured")
+        
+        layout.addWidget(self.tabs)
+        
+        # Action buttons
+        btn_layout = QHBoxLayout()
+        self.pin_btn = QPushButton("Pin/Unpin Selected")
+        self.pin_btn.clicked.connect(self._toggle_pin)
+        
+        self.select_btn = QPushButton("Select")
+        self.select_btn.clicked.connect(self._accept_selection)
+        
+        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.clicked.connect(self.reject)
+        
+        btn_layout.addWidget(self.pin_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.cancel_btn)
+        btn_layout.addWidget(self.select_btn)
+        
+        layout.addLayout(btn_layout)
+
+    def _load_data(self):
+        from src.backend.env_parser import get_kicad_libraries
+        self.pinned_list.clear()
+        self.recent_list.clear()
+        self.all_list.clear()
+        
+        pinned = config.get(self.pinned_key, [])
+        recent = config.get(self.recent_key, [])
+        
+        for p in pinned:
+            self._add_item(self.pinned_list, p)
             
-            # Set tooltip for each item in the dropdown list
-            last_index = self.combo.count() - 1
-            self.combo.setItemData(last_index, path, Qt.ItemDataRole.ToolTipRole)
+        for r in recent:
+            if r not in pinned: # Don't duplicate in recents if it's pinned
+                self._add_item(self.recent_list, r)
+                
+        try:
+            syms, fps = get_kicad_libraries()
+            all_libs = syms if self.lib_type == "symbol" else fps
+            for lib in all_libs:
+                path_str = lib.get("path", "")
+                name = lib.get("nickname", pathlib.Path(path_str).name)
+                # Ensure we add using a similar visual format, but with nickname
+                item = QListWidgetItem(f"{name} ({pathlib.Path(path_str).name})")
+                item.setToolTip(path_str)
+                item.setData(Qt.ItemDataRole.UserRole, path_str)
+                self.all_list.addItem(item)
+        except Exception:
+            pass
 
-        # Update completer model to match the combo box items
-        self.completer.setModel(self.combo.model())
+    def _add_item(self, list_widget, path_str):
+        item = QListWidgetItem(pathlib.Path(path_str).name)
+        item.setToolTip(path_str)
+        item.setData(Qt.ItemDataRole.UserRole, path_str)
+        list_widget.addItem(item)
 
-    def get_selected_path(self) -> str:
-        """Returns the absolute path of the currently selected library."""
-        index = self.combo.currentIndex()
-        if index >= 0:
-            return self.combo.itemData(index, Qt.ItemDataRole.UserRole)
-        return ""
+    def _filter_lists(self, text):
+        query = text.lower()
+        for list_widget in [self.pinned_list, self.recent_list, self.all_list]:
+            for i in range(list_widget.count()):
+                item = list_widget.item(i)
+                path_str = item.data(Qt.ItemDataRole.UserRole).lower()
+                name_str = item.text().lower()
+                item.setHidden(query not in path_str and query not in name_str)
 
-    def set_selected_path(self, path: str):
-        """Selects the item matching the given absolute path."""
-        for i in range(self.combo.count()):
-            if self.combo.itemData(i, Qt.ItemDataRole.UserRole) == path:
-                self.combo.setCurrentIndex(i)
-                return
-        # If not found, we don't change selection or we could clear it
-        self.combo.setCurrentIndex(-1)
-
-    def set_collision_error(self, has_collision: bool):
-        """
-        Highlights the widget in red if a collision is detected.
-        Used to alert the user that the part name already exists in the selected library.
-        """
-        if has_collision:
-            # Apply a red border style
-            self.combo.setStyleSheet("""
-                QComboBox {
-                    border: 2px solid #FF0000;
-                    border-radius: 4px;
-                    background-color: #FFF0F0;
-                }
-            """)
-            self.combo.setToolTip("Collision Warning: Part name already exists in this library!")
+    def _toggle_pin(self):
+        current_list = self.tabs.currentWidget()
+        item = current_list.currentItem()
+        if not item: return
+        
+        path_str = item.data(Qt.ItemDataRole.UserRole)
+        pinned = config.get(self.pinned_key, [])
+        
+        if path_str in pinned:
+            pinned.remove(path_str)
         else:
-            # Reset to default style
-            self.combo.setStyleSheet("")
-            # Reset tooltip to the selected path
-            path = self.get_selected_path()
-            self.combo.setToolTip(path if path else "")
+            pinned.append(path_str)
+            
+        config.set(self.pinned_key, pinned)
+        config.save()
+        self._load_data()
 
-    def _on_index_changed(self, index: int):
-        """Handles selection changes and updates the widget tooltip."""
-        if index >= 0:
-            path = self.combo.itemData(index, Qt.ItemDataRole.UserRole)
-            self.combo.setToolTip(path)
-            self.libraryChanged.emit(path)
+    def _add_to_recent(self, path_str):
+        recent = config.get(self.recent_key, [])
+        if path_str in recent:
+            recent.remove(path_str)
+        recent.insert(0, path_str)
+        
+        # Keep only last 20 recents
+        recent = recent[:20]
+        config.set(self.recent_key, recent)
+        config.save()
+        self._load_data()
+
+    def _browse_system(self):
+        if self.lib_type == "symbol":
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Select Symbol Library", "", "KiCad Symbol Library (*.kicad_sym)"
+            )
+            if file_path:
+                self._add_to_recent(file_path)
+                self.librarySelected.emit(file_path)
+                self.accept()
         else:
-            self.combo.setToolTip("")
+            directory = QFileDialog.getExistingDirectory(
+                self, "Select Footprint Library (.pretty folder)"
+            )
+            if directory:
+                self._add_to_recent(directory)
+                self.librarySelected.emit(directory)
+                self.accept()
+
+    def _accept_selection(self):
+        current_list = self.tabs.currentWidget()
+        item = current_list.currentItem()
+        if item:
+            path_str = item.data(Qt.ItemDataRole.UserRole)
+            self._add_to_recent(path_str)
+            self.librarySelected.emit(path_str)
+            self.accept()
+

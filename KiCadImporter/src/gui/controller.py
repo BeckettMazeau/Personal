@@ -14,6 +14,8 @@ from src.backend.env_parser import KiCadEnvParser
 from src.backend.models import ImportTask, ImportStatus, validate_paths
 from src.backend.exceptions import KiCadImportError
 
+
+
 from src.gui.main_window import MainWindow
 from src.gui.queue_widget import QueueWidget
 from src.gui.preview_widget import PreviewWidget
@@ -38,19 +40,25 @@ class ProcessingWorker(QRunnable):
 
     def run(self):
         try:
+            logger.debug(f"Starting ProcessingWorker for: {self.zip_path}")
             self.signals.progress.emit(f"Extracting {os.path.basename(self.zip_path)}...")
             
             # 1. Extract Archive
             workspace = self.workspace_mgr.extract_archive(self.zip_path)
+            logger.debug(f"Archive extracted to workspace: {workspace}")
+            
             files = self.workspace_mgr.identify_files()
+            logger.debug(f"Identified files: {files}")
             
             # 2. Group files and suggest part name
             all_files = files[".kicad_sym"] + files[".kicad_mod"]
             if not all_files:
+                logger.warning("No KiCad symbol or footprint files found in archive.")
                 self.signals.error.emit("No KiCad symbol or footprint files found in archive.")
                 return
 
             part_name = suggest_part_name([str(p) for p in all_files])
+            logger.debug(f"Suggested part name: {part_name}")
             
             # 3. Create ImportTask
             task = ImportTask(
@@ -67,23 +75,31 @@ class ProcessingWorker(QRunnable):
             # 4. Generate Previews
             preview_dir = pathlib.Path(workspace) / "previews"
             preview_dir.mkdir(exist_ok=True)
+            logger.debug(f"Created preview directory at: {preview_dir}")
             
             previews = {"symbol": None, "footprint": None}
             
             if task.symbol_source_path:
+                logger.debug(f"Attempting to generate symbol preview for {task.symbol_source_path}")
                 self.signals.progress.emit("Generating symbol preview...")
                 out_path = preview_dir / f"{part_name}_sym.svg"
                 res = self.cli.generate_symbol_preview(task.symbol_source_path, out_path)
+                logger.debug(f"Symbol preview generation result: success={res.success}, error={res.error_message}, output_files={res.output_files}")
+                logger.debug(f"Symbol CLI Logs:\n{res.logs}")
                 if res.success:
                     previews["symbol"] = res.output_files[0]
             
             if task.footprint_source_path:
+                logger.debug(f"Attempting to generate footprint preview for {task.footprint_source_path}")
                 self.signals.progress.emit("Generating footprint preview...")
-                out_path = preview_dir / f"{part_name}_fp.svg"
+                out_path = preview_dir / f"{part_name}_fp_out"
                 res = self.cli.generate_footprint_preview(task.footprint_source_path, out_path)
+                logger.debug(f"Footprint preview generation result: success={res.success}, error={res.error_message}, output_files={res.output_files}")
+                logger.debug(f"Footprint CLI Logs:\n{res.logs}")
                 if res.success:
                     previews["footprint"] = res.output_files[0]
 
+            logger.debug(f"ProcessingWorker finished successfully for {part_name}")
             self.signals.finished.emit((task, previews))
 
         except Exception as e:
@@ -112,17 +128,31 @@ class ExecutionWorker(QRunnable):
         for task in self.tasks:
             if task.status == ImportStatus.COMPLETED:
                 continue
-                
+
+            # Symptom 5: Respect collision status — do not blindly overwrite
+            if task.status == ImportStatus.COLLISION:
+                errors.append(f"{task.extracted_part_name}: Collision detected — skipped (resolve collision first)")
+                continue
+
+            # Symptom 6: Fail tasks that have no target libraries configured
+            has_sym_target = bool(task.symbol_source_path and task.target_symbol_lib)
+            has_fp_target = bool(task.footprint_source_path and task.target_footprint_lib)
+            if not has_sym_target and not has_fp_target:
+                task.status = ImportStatus.FAILED
+                task.error_message = "No target libraries configured"
+                errors.append(f"{task.extracted_part_name}: No target libraries configured")
+                continue
+
             try:
                 task.status = ImportStatus.PROCESSING
                 self.signals.progress.emit(f"Importing {task.extracted_part_name}...")
                 
                 # Copy Symbol
-                if task.symbol_source_path and task.target_symbol_lib:
+                if has_sym_target:
                     self.workspace_mgr.copy_to_target(task.symbol_source_path, task.target_symbol_lib)
                 
                 # Copy Footprint
-                if task.footprint_source_path and task.target_footprint_lib:
+                if has_fp_target:
                     self.workspace_mgr.copy_to_target(task.footprint_source_path, task.target_footprint_lib)
                 
                 task.status = ImportStatus.COMPLETED

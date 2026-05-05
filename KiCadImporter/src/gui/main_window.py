@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QEvent
 from PyQt6.QtGui import QAction, QDragEnterEvent, QDropEvent, QCloseEvent
+from src.gui.settings_dialog import SettingsDialog
 
 class MainWindow(QMainWindow):
     """
@@ -35,6 +36,9 @@ class MainWindow(QMainWindow):
         # Apply modern styling
         self._apply_styles()
         
+        # Show the window so child widgets become visible
+        self.show()
+        
     def _init_menu_bar(self):
         """Initializes the standard menu bar."""
         menubar = self.menuBar()
@@ -48,7 +52,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(open_action)
         
         settings_action = QAction("&Settings", self)
-        settings_action.triggered.connect(lambda: self.show_message("Settings clicked (Placeholder)"))
+        settings_action.triggered.connect(self._open_settings)
         file_menu.addAction(settings_action)
         
         file_menu.addSeparator()
@@ -165,6 +169,7 @@ class MainWindow(QMainWindow):
         if idx != -1:
             self.queue_placeholder.hide()
             self.splitter.replaceWidget(idx, widget)
+            widget.show()
             self.queue_placeholder = widget # Track the new widget
         else:
             # If already replaced, just add/replace logic could be more complex
@@ -180,6 +185,7 @@ class MainWindow(QMainWindow):
         if idx != -1:
             self.preview_placeholder.hide()
             self.splitter.replaceWidget(idx, widget)
+            widget.show()
             self.preview_placeholder = widget
             
     # --- Drag and Drop Handling ---
@@ -223,6 +229,11 @@ class MainWindow(QMainWindow):
             "<p>A tool to facilitate importing symbols and footprints into KiCad libraries.</p>"
             "<p>Version: 0.1.0</p>"
         )
+
+    def _open_settings(self):
+        """Opens the Settings dialog."""
+        dialog = SettingsDialog(self)
+        dialog.exec()
         
     def show_message(self, message: str, timeout: int = 5000):
         """Helper to show a message in the status bar."""
