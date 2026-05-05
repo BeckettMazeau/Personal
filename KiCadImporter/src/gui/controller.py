@@ -57,7 +57,7 @@ class ProcessingWorker(QRunnable):
                 self.signals.error.emit("No KiCad symbol or footprint files found in archive.")
                 return
 
-            part_name = suggest_part_name([str(p) for p in all_files])
+            part_name = suggest_part_name([str(p) for p in all_files], self.zip_path)
             logger.debug(f"Suggested part name: {part_name}")
             
             # 3. Create ImportTask

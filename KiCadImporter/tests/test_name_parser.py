@@ -1,5 +1,4 @@
 import pytest
-from unittest.mock import patch
 from src.backend.name_parser import suggest_part_name
 
 def test_suggest_part_name_empty():
@@ -9,37 +8,31 @@ def test_suggest_part_name_single_file():
     files = ["Mouser_LM358_v1.kicad_sym"]
     assert suggest_part_name(files) == "LM358"
 
-def test_suggest_part_name_multiple_files_common_denominator():
+def test_suggest_part_name_zip_hint():
+    # Zip name should be preferred over a timestamp-named symbol file
+    zip_path = "ul_ESP32-S3-WROOM-1-N16R8.zip"
     files = [
-        "Mouser_LM358_v1.kicad_sym",
-        "DigiKey_LM358.kicad_mod",
-        "LM358_3dmodel.step"
+        "2026-05-05_07-59-52.kicad_sym",
+        "ESP32-S3-WROOM-1-N16R8.kicad_mod"
     ]
-    # "LM358" is common to all
-    assert suggest_part_name(files) == "LM358"
+    assert suggest_part_name(files, zip_path) == "ESP32-S3-WROOM-1-N16R8"
 
-def test_suggest_part_name_complex_names():
+def test_suggest_part_name_timestamp_avoidance():
+    # Should avoid timestamp even without zip hint if another descriptive file exists
     files = [
-        "TexasInstruments_SN74HC595N.kicad_sym",
-        "SN74HC595N_footprint.kicad_mod"
+        "2026-05-05_07-59-52.kicad_sym",
+        "SN74HC595N.kicad_mod"
     ]
-    assert "SN74HC595N" in suggest_part_name(files)
-
-@patch('src.backend.name_parser.os.path.getsize')
-@patch('src.backend.name_parser.os.path.exists')
-def test_suggest_part_name_no_common_substring(mock_exists, mock_getsize):
-    # Mock os.path.getsize to force fallback behavior
-    mock_exists.return_value = True
-    mock_getsize.side_effect = [100, 200, 50]
-    
-    files = [
-        "A.kicad_sym",
-        "B.kicad_mod",
-        "C.step"
-    ]
-    # File B is the largest, so it should fallback to 'B'
-    assert suggest_part_name(files) == "B"
+    assert suggest_part_name(files) == "SN74HC595N"
 
 def test_suggest_part_name_normalization():
     files = ["My---Messy___Part  Name.kicad_sym"]
     assert suggest_part_name(files) == "My-Messy-Part-Name"
+
+def test_suggest_part_name_vendor_prefixes():
+    files = ["ul_LM358.kicad_sym"]
+    assert suggest_part_name(files) == "LM358"
+    
+    files = ["snapeda_NE555.kicad_mod"]
+    assert suggest_part_name(files) == "NE555"
+
