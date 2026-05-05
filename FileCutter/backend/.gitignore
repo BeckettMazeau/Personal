@@ -1,3 +1,4 @@
 
 file_cache.db
 *.db
+venv/

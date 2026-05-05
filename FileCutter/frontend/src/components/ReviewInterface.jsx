@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import SettingsModal from './SettingsModal';
+
 import VirtualizedFileList from './VirtualizedFileList';
 import PreviewPane from './PreviewPane';
 import SafetyLockModal from './SafetyLockModal';
@@ -15,6 +17,8 @@ const ReviewInterface = () => {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [error, setError] = useState(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
 
   useEffect(() => {
     fetchFiles();
@@ -159,6 +163,20 @@ const ReviewInterface = () => {
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>FileCutter Review</h1>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <span style={{ fontSize: '0.875rem' }}>{selectedFilePaths.size} files selected</span>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#4a5568',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            Settings
+          </button>
           <button
             onClick={handleExecuteClick}
             disabled={selectedFilePaths.size === 0}
