@@ -5,13 +5,18 @@ from unittest.mock import patch, MagicMock
 from app.services.file_service import scan_directory
 from app.core.utils import batch_files
 from app.models.schemas import FileObject, FileSource
+from pathlib import Path
 
 class TestFileService(unittest.TestCase):
 
     @patch("app.services.file_service.os.walk")
-    @patch("app.services.file_service.os.stat")
-    def test_scan_directory(self, mock_stat, mock_walk):
-        # Setup mock directory structure
+    @patch("app.services.file_service.Path.exists")
+    @patch("app.services.file_service.Path.is_dir")
+    @patch("app.services.file_service.Path.stat")
+    def test_scan_directory(self, mock_stat, mock_is_dir, mock_exists, mock_walk):
+        mock_exists.return_value = True
+        mock_is_dir.return_value = True
+
         mock_walk.return_value = [
             ("/test_dir", ("subdir",), ("test.exe", "document.pdf", "temp.tmp")),
         ]
@@ -21,7 +26,6 @@ class TestFileService(unittest.TestCase):
         mock_stat_result.st_ctime = 1600000000.0
         mock_stat.return_value = mock_stat_result
 
-        # Run async function
         files = asyncio.run(scan_directory("/test_dir"))
 
         self.assertEqual(len(files), 3)
@@ -42,7 +46,6 @@ class TestFileService(unittest.TestCase):
         self.assertTrue(tmp_file.suggested_action)
 
     def test_batch_files(self):
-        # Create dummy files
         files = [
             FileObject(
                 path=f"/test/file{i}.txt",
