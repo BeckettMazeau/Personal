@@ -1,0 +1,2 @@
+PyQt6>=6.6.0
+# Standard libraries (subprocess, pathlib, dataclasses) are included in Python 3.9+ and do not need to be listed here.
