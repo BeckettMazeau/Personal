@@ -17,24 +17,4 @@ export const executeCleanup = async (fileIds, confirmationToken) => {
   return response.data;
 };
 
-export const getModels = async () => {
-  const response = await api.get('/api/models');
-  return response.data;
-};
-
-export const getHealth = async () => {
-  const response = await api.get('/api/health/lm_studio');
-  return response.data;
-};
-
-export const getSettings = async () => {
-  const response = await api.get('/api/settings');
-  return response.data;
-};
-
-export const updateSettings = async (settings) => {
-  const response = await api.post('/api/settings', settings);
-  return response.data;
-};
-
 export default api;
