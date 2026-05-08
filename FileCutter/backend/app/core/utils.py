@@ -52,3 +52,26 @@ def batch_files(files: List[FileObject], batch_size: int = 20) -> List[List[File
 from pathlib import Path
 def get_downloads_directory() -> Path:
     return Path.home() / "Downloads"
+
+import json
+from typing import Any, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+def clean_and_parse_json(content: str) -> Optional[Any]:
+    """Cleans markdown JSON formatting and parses it."""
+    if not content:
+        return None
+
+    try:
+        clean_content = content.strip()
+        if clean_content.startswith("```json"):
+            clean_content = clean_content[7:]
+        if clean_content.endswith("```"):
+            clean_content = clean_content[:-3]
+
+        return json.loads(clean_content)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON response: {e}\nContent: {content}")
+        return None
