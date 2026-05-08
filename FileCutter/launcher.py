@@ -133,8 +133,8 @@ def launch_services():
         print("Services stopped successfully.")
 
 def main():
-    batch_size = check_hardware()
     setup_dependencies()
+    check_hardware()
     launch_services()
 
 if __name__ == "__main__":

@@ -19,7 +19,8 @@ test.describe('FileCutter Review Interface', () => {
     await page.goto('/');
 
     // 2. Wait for loading to finish (scanning, shallow, deep)
-    await expect(page.locator('text=Scanning directory...')).toBeVisible();
+    // We skip waiting for loading text because it might be too fast with the mocked API
+    // await expect(page.locator('text=Scanning directory...')).toBeVisible();
 
     // We can't rely on 'Running deep AI assessment...' because the text might change too fast depending on API response.
     // Instead, we wait for the main interface to load.

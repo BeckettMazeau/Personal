@@ -1,15 +1,14 @@
 import asyncio
-import json
 import logging
 from typing import List, Dict, Any, Optional
 import aiohttp
 import fitz  # PyMuPDF
 from pptx import Presentation
 import os
-import sqlite3
 import hashlib
 from app.core.config import settings
-from app.core.utils import get_optimal_batch_size, batch_files
+from app.core.utils import get_optimal_batch_size, clean_and_parse_json
+from app.core.cache import SQLiteCache
 
 logger = logging.getLogger(__name__)
 
@@ -17,20 +16,7 @@ class AIOrchestrator:
     def __init__(self, lm_studio_url: str = settings.lm_studio_url):
         self.lm_studio_url = lm_studio_url
         self.timeout = aiohttp.ClientTimeout(total=60)
-        self.cache_db = "file_cache.db"
-        self._init_cache()
-
-    def _init_cache(self):
-        conn = sqlite3.connect(self.cache_db)
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS file_assessments (
-                hash TEXT PRIMARY KEY,
-                result TEXT
-            )
-        ''')
-        conn.commit()
-        conn.close()
+        self.cache = SQLiteCache()
 
     def _get_file_hash(self, filepath: str) -> str:
         if not os.path.exists(filepath):
@@ -38,38 +24,12 @@ class AIOrchestrator:
         hasher = hashlib.sha256()
         try:
             with open(filepath, 'rb') as f:
-                buf = f.read(65536)
-                while len(buf) > 0:
-                    hasher.update(buf)
-                    buf = f.read(65536)
+                while chunk := f.read(8192):
+                    hasher.update(chunk)
             return hasher.hexdigest()
         except Exception as e:
             logger.error(f"Error hashing {filepath}: {e}")
             return ""
-
-    def _get_from_cache(self, file_hash: str) -> Optional[Dict[str, Any]]:
-        if not file_hash:
-            return None
-        conn = sqlite3.connect(self.cache_db)
-        cursor = conn.cursor()
-        cursor.execute("SELECT result FROM file_assessments WHERE hash = ?", (file_hash,))
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            try:
-                return json.loads(row[0])
-            except:
-                pass
-        return None
-
-    def _save_to_cache(self, file_hash: str, result: Dict[str, Any]):
-        if not file_hash:
-            return
-        conn = sqlite3.connect(self.cache_db)
-        cursor = conn.cursor()
-        cursor.execute("INSERT OR REPLACE INTO file_assessments (hash, result) VALUES (?, ?)", (file_hash, json.dumps(result)))
-        conn.commit()
-        conn.close()
 
     async def _call_llm(self, messages: List[Dict[str, str]], response_format: Optional[Dict] = None) -> Optional[str]:
         """Helper to call LM Studio REST API with error handling and timeout."""
@@ -119,26 +79,13 @@ class AIOrchestrator:
         ]
 
         content = await self._call_llm(messages)
+        result = clean_and_parse_json(content)
 
-        if not content:
-            return []
+        if isinstance(result, list):
+            return result
 
-        try:
-            clean_content = content.strip()
-            if clean_content.startswith("```json"):
-                clean_content = clean_content[7:]
-            if clean_content.endswith("```"):
-                clean_content = clean_content[:-3]
-
-            result = json.loads(clean_content)
-            if isinstance(result, list):
-                return result
-            else:
-                logger.error(f"LLM returned JSON, but it's not a list: {result}")
-                return []
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Tier 1 JSON response: {e}\nContent: {content}")
-            return []
+        logger.error(f"LLM returned JSON, but it's not a list: {result}")
+        return []
 
     def _extract_text(self, filepath: str, max_words: int = 500) -> str:
         """Extract up to max_words from a PDF or PPTX file."""
@@ -214,33 +161,18 @@ class AIOrchestrator:
         ]
 
         content = await self._call_llm(messages)
+        result = clean_and_parse_json(content)
 
-        if not content:
-            return {
-                "filename": os.path.basename(filepath),
-                "delete": False,
-                "confidence": 1,
-                "reasoning": "LLM failed to respond during deep pass."
-            }
-
-        try:
-            clean_content = content.strip()
-            if clean_content.startswith("```json"):
-                clean_content = clean_content[7:]
-            if clean_content.endswith("```"):
-                clean_content = clean_content[:-3]
-
-            result = json.loads(clean_content)
+        if result and isinstance(result, dict):
             result["filename"] = os.path.basename(filepath)
             return result
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Tier 2 JSON response: {e}\nContent: {content}")
-            return {
-                "filename": os.path.basename(filepath),
-                "delete": False,
-                "confidence": 1,
-                "reasoning": "Failed to parse LLM response format."
-            }
+
+        return {
+            "filename": os.path.basename(filepath),
+            "delete": False,
+            "confidence": 1,
+            "reasoning": "Failed to parse LLM response format." if content else "LLM failed to respond during deep pass."
+        }
 
     async def process_files(self, filepaths: List[str]) -> List[Dict[str, Any]]:
         """Run the complete 2-tier evaluation pipeline."""
@@ -251,7 +183,7 @@ class AIOrchestrator:
         for filepath in filepaths:
             file_hash = self._get_file_hash(filepath)
             filepath_hash_map[filepath] = file_hash
-            cached_result = self._get_from_cache(file_hash)
+            cached_result = self.cache.get(file_hash)
             if cached_result:
                 final_results.append(cached_result)
             else:
@@ -287,13 +219,13 @@ class AIOrchestrator:
             else:
                 final_results.append(item)
                 if filename in filepath_map:
-                    self._save_to_cache(filepath_hash_map[filepath_map[filename]], item)
+                    self.cache.set(filepath_hash_map[filepath_map[filename]], item)
 
         if tier_2_tasks:
             tier_2_outputs = await asyncio.gather(*tier_2_tasks)
             for (filepath, original_item), tier_2_result in zip(tier_2_items, tier_2_outputs):
                 tier_2_result["reasoning"] = f"Tier 1 reasoning: {original_item.get('reasoning')}. Tier 2 reasoning: {tier_2_result.get('reasoning')}"
                 final_results.append(tier_2_result)
-                self._save_to_cache(filepath_hash_map[filepath], tier_2_result)
+                self.cache.set(filepath_hash_map[filepath], tier_2_result)
 
         return final_results
