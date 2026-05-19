@@ -1,0 +1,110 @@
+EpubShield Change Log — ocr_repair_test
+Output file: OCR Diagnostics and Repair Test Protocol - Unknown Author.epub
+Generated: 2026-05-11 18:35:12
+Total changes: 34
+============================================================
+
+Chapter/Item: chapter_0
+----------------------------------------
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'livmg'
+    AFTER:  'living'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'stanclard'
+    AFTER:  'standard'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: '\n\nOCR Repair Diagnostics\n\nTbe Industria1 Revolution marks a major tuming point m bistory; almost every aspeet of daily l'
+    AFTER:  'OCR Repair Diagnostics\n\nTbe Industria1 Revolution marks a major tuming point m bistory; almost every aspeet of daily lif'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'incomc'
+    AFTER:  'income'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'avcrage'
+    AFTER:  'average'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'lucneed'
+    AFTER:  'influenced'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'aspeet'
+    AFTER:  'aspect'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'bistory'
+    AFTER:  'history'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'Industria1'
+    AFTER:  'Industrial'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'consistcnt1y'
+    AFTER:  'consistently'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'genera1'
+    AFTER:  'general'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'rnanufaeture'
+    AFTER:  'manufacture'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: '1arge'
+    AFTER:  'large'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'stcam'
+    AFTER:  'steam'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'teehnological'
+    AFTER:  'technological'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'Revo1ution'
+    AFTER:  'Revolution'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: '5econd'
+    AFTER:  'second'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'evo1ved'
+    AFTER:  'evolved'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'Inelustrial'
+    AFTER:  'Industrial'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'too1s'
+    AFTER:  'tools'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'eountryside'
+    AFTER:  'countryside'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'mflux'
+    AFTER:  'influx'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'oftcn'
+    AFTER:  'often'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'eonditions'
+    AFTER:  'living'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'livmg'
+    AFTER:  'brought'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'crampcd'
+    AFTER:  'cramped'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'brougbt'
+    AFTER:  'brought'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'urbamzation'
+    AFTER:  'urbanization'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'Howcver'
+    AFTER:  'However'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'advancernent'
+    AFTER:  'advancement'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'tccbno1ogical'
+    AFTER:  'technological'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'tbese'
+    AFTER:  'these'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'Dcspite'
+    AFTER:  'Despite'
+  [HIGH] llm_garble_correction (confidence: 95.0%)
+    BEFORE: 'lcading'
+    AFTER:  'leading'
