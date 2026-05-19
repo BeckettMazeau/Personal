@@ -54,24 +54,87 @@ def get_downloads_directory() -> Path:
     return Path.home() / "Downloads"
 
 import json
+import re
 from typing import Any, Optional
 import logging
 
 logger = logging.getLogger(__name__)
 
-def clean_and_parse_json(content: str) -> Optional[Any]:
-    """Cleans markdown JSON formatting and parses it."""
+_FENCE_RE = re.compile(r"^```(?:json|JSON)?\s*\n?", re.IGNORECASE)
+
+
+def _strip_code_fence(text: str) -> str:
+    stripped = text.strip()
+    m = _FENCE_RE.match(stripped)
+    if m:
+        stripped = stripped[m.end():]
+        if stripped.rstrip().endswith("```"):
+            stripped = stripped.rstrip()[:-3]
+    return stripped.strip()
+
+
+def _extract_balanced(text: str) -> Optional[str]:
+    """Return the largest brace- or bracket-balanced substring, or None."""
+    best: Optional[str] = None
+    for open_ch, close_ch in (("{", "}"), ("[", "]")):
+        start = text.find(open_ch)
+        while start != -1:
+            depth = 0
+            in_str = False
+            esc = False
+            for i in range(start, len(text)):
+                ch = text[i]
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif ch == "\\":
+                        esc = True
+                    elif ch == '"':
+                        in_str = False
+                    continue
+                if ch == '"':
+                    in_str = True
+                elif ch == open_ch:
+                    depth += 1
+                elif ch == close_ch:
+                    depth -= 1
+                    if depth == 0:
+                        candidate = text[start:i + 1]
+                        if best is None or len(candidate) > len(best):
+                            best = candidate
+                        break
+            start = text.find(open_ch, start + 1)
+    return best
+
+
+def clean_and_parse_json(content: Optional[str]) -> Optional[Any]:
+    """Robustly parse JSON from an LLM response.
+
+    Tries direct parse, then strips ```json / ``` fences, then extracts
+    the largest balanced brace/bracket substring. Returns None on failure.
+    """
     if not content:
         return None
 
     try:
-        clean_content = content.strip()
-        if clean_content.startswith("```json"):
-            clean_content = clean_content[7:]
-        if clean_content.endswith("```"):
-            clean_content = clean_content[:-3]
+        return json.loads(content.strip())
+    except json.JSONDecodeError:
+        pass
 
-        return json.loads(clean_content)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse JSON response: {e}\nContent: {content}")
-        return None
+    unfenced = _strip_code_fence(content)
+    if unfenced != content.strip():
+        try:
+            return json.loads(unfenced)
+        except json.JSONDecodeError:
+            pass
+
+    candidate = _extract_balanced(unfenced) or _extract_balanced(content)
+    if candidate:
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+    snippet = content[:200].replace("\n", " ")
+    logger.warning(f"Failed to parse JSON response. Snippet: {snippet!r}")
+    return None
