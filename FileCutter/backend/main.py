@@ -1,4 +1,5 @@
 import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,14 +15,18 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Configure CORS for local frontend communication
+# CORS: FileCutter is a single-user local tool. Only the Vite dev server origin
+# is allowed. The legacy ":3000" entry was dropped — confirm with the Vite
+# config if a non-default port is ever introduced.
+# allow_credentials is False because the nonce flow uses an explicit request
+# body field, not cookies.
+#
+# NOTE: uvicorn should be launched with --host 127.0.0.1 so the API never
+# binds to external interfaces. The launcher owns that flag.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-    ],  # Typical React/Vite dev ports
-    allow_credentials=True,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -1,13 +1,16 @@
-import os
-from app.core.config import settings
-import send2trash
 import logging
-from typing import List
+import os
+from pathlib import Path
+from typing import List, Optional
+
+import send2trash
+
+from app.core.config import settings
+from app.core.nonces import NonceStore
+from app.core.paths import safe_resolve
 
 logger = logging.getLogger(__name__)
 
-# Load secret from environment variables
-SERVER_SIDE_SECRET = settings.confirmation_token_secret
 
 class SecureDeletionManager:
     """
@@ -18,33 +21,46 @@ class SecureDeletionManager:
     is expressly PROHIBITED to ensure safety and allow user recovery of files.
     """
 
+    def __init__(self, allowed_root: Optional[Path] = None):
+        self.allowed_root = Path(allowed_root) if allowed_root else Path(settings.downloads_path)
 
-    def delete_files(self, file_paths: List[str], confirmation_token: str):
+    def delete_files(self, file_paths: List[str], nonce: str, nonce_store: NonceStore):
         """
-        Safely deletes multiple files by sending them to the operating system's trash/recycle bin.
+        Safely delete files by sending them to the OS trash.
 
-        Args:
-            file_paths (List[str]): The absolute paths to the files to be deleted.
-            confirmation_token (str): Token to authorize the deletion.
+        Authorization: a one-time `nonce` previously issued by `nonce_store`
+        and bound to the exact set of `file_paths` must be presented. The
+        nonce is consumed on use. Each path is then re-resolved and verified
+        to live inside `self.allowed_root` before deletion.
         """
-        if confirmation_token != SERVER_SIDE_SECRET:
-            raise ValueError("Invalid confirmation token. Deletion aborted.")
+        if not nonce_store.consume(nonce, file_paths):
+            raise ValueError(
+                "Invalid, expired, reused, or path-mismatched deletion nonce."
+            )
+
+        resolved_paths: List[Path] = []
+        for raw_path in file_paths:
+            try:
+                resolved = safe_resolve(raw_path, self.allowed_root)
+            except ValueError as e:
+                raise ValueError(f"Refusing to delete {raw_path!r}: {e}") from e
+            resolved_paths.append(resolved)
 
         deleted_count = 0
-        for file_path in file_paths:
-            # Explicit validation: ensure it's a file that exists
-            if not os.path.exists(file_path):
-                logger.warning(f"File not found, skipping: {file_path}")
+        for resolved in resolved_paths:
+            path_str = str(resolved)
+            if not os.path.exists(path_str):
+                logger.warning(f"File not found, skipping: {path_str}")
                 continue
-            if not os.path.isfile(file_path):
-                 logger.warning(f"Path is not a file, skipping: {file_path}")
-                 continue
+            if not os.path.isfile(path_str):
+                logger.warning(f"Path is not a file, skipping: {path_str}")
+                continue
 
-            logger.info(f"Sending file to trash: {file_path}")
+            logger.info(f"Sending file to trash: {path_str}")
             try:
-                send2trash.send2trash(file_path)
+                send2trash.send2trash(path_str)
                 deleted_count += 1
             except Exception as e:
-                 logger.error(f"Failed to send {file_path} to trash: {e}")
+                logger.error(f"Failed to send {path_str} to trash: {e}")
 
         return {"status": "success", "deleted_count": deleted_count}
