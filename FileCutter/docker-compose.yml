@@ -7,11 +7,11 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./backend:/app
-      - /:/host_fs:ro # Allow read-only access to host filesystem
+      - ~/Downloads:/downloads:ro # Scope host access to the user's Downloads directory only
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
-      - TARGET_DOWNLOADS_PATH=/host_fs/Downloads
+      - TARGET_DOWNLOADS_PATH=/downloads
       - LM_STUDIO_API_BASE=http://host.docker.internal:1234/v1
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -24,7 +24,6 @@ services:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "5173:5173"
-      - "3000:3000"
+      - "127.0.0.1:5173:5173"
     environment:
       - NODE_ENV=development
