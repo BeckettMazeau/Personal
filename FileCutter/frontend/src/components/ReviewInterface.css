@@ -34,3 +34,102 @@
     flex: 1;
   }
 }
+
+/* Extracted from ReviewInterface.jsx */
+.loading-container {
+  padding: 2rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+.progress-bar-container {
+  width: 300px;
+  height: 10px;
+  background-color: #e2e8f0;
+  border-radius: 5px;
+  margin-top: 1rem;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #4299e1;
+  transition: width 0.3s ease;
+}
+
+.error-container {
+  padding: 2rem;
+  color: red;
+}
+
+.review-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.header {
+  padding: 1rem;
+  background-color: #2d3748;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.file-count {
+  font-size: 0.875rem;
+}
+
+.execute-btn {
+  padding: 0.5rem 1rem;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.execute-btn.active {
+  background-color: #e53e3e;
+  cursor: pointer;
+}
+
+.execute-btn.disabled {
+  background-color: #fc8181;
+  cursor: not-allowed;
+}
+
+.quick-select-bar {
+  padding: 1rem;
+  background-color: #f7fafc;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.quick-select-btn {
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+
+.clear-select-btn {
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  margin-left: auto;
+}
